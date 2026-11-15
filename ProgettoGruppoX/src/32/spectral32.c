@@ -214,7 +214,7 @@ void eigenvectors(params* input){
 	}
 
 	orthonormalize(input);
-	type* Z = _mm_malloc(input->N * input->c, sizeof(type));
+	type* Z = _mm_malloc(input->N * input->c * sizeof(type), align);
 	type sum = 0.0;
 
 	for (int t = 0; t < input->eig_iters; t++){

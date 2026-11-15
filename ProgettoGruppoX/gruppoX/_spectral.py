@@ -49,7 +49,7 @@ class SpectralClustering:
         self.version = version
         self.silent = silent
 
-    def init_centroids(Y, c):
+    def init_centroids(self, Y, c):
         n = Y.shape[0]
         idx = [0]
         dmin = ((Y - Y[0]) ** 2).sum(1)
@@ -83,7 +83,7 @@ class SpectralClustering:
         start = time.time()
         # Centroidi iniziali deterministici: righe in posizione floor(N/c)*j
         n, c = Y.shape
-        init = init_centroids(Y, c)
+        init = self.init_centroids(Y, c)
 
         kmeans = KMeans(n_clusters=c, init=init, n_init=1,
                         max_iter=self.km_iters, tol=0, algorithm='lloyd')
