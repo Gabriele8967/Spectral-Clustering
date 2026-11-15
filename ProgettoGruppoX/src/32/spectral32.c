@@ -216,7 +216,7 @@ void eigenvectors(params* input){
         }
     }
 
-    orthonormalize(U);
+    orthonormalize(U, input->N, input->c);
     type* Z = calloc(input->N * input->c, sizeof(type));
     type sum = 0.0;
 
@@ -231,7 +231,7 @@ void eigenvectors(params* input){
             }
         }
 
-        orthonormalize(Z); // chiamo la funzione orthonormalize supponendo che dentro la funzione vengano aggiornati i valori di Z
+        orthonormalize(Z, input->N, input->c); // chiamo la funzione orthonormalize supponendo che dentro la funzione vengano aggiornati i valori di Z
 
 
         type* temp = U;   // Salvo il vecchio indirizzo U
