@@ -33,7 +33,7 @@ static void insert_new_NN(params* input, const int i, const int j, const type ds
 	//incremento position
 	unsigned position = 0;
 	for (int t = i * K; t < ((i * K) + K); t++) {
-		if (input->dst[t] < dst_j) {
+		if (input->dst[t] <= dst_j) {
 			position++;
 		}
 	}
@@ -42,26 +42,25 @@ static void insert_new_NN(params* input, const int i, const int j, const type ds
 	//Quindi, partendo dal penultimo, li sposto tutti verso destra, in modo tale che
 	//libero lo slot dove inserire il nuovo vicino
 	for(int k = K - 1; k > position; k--){
-		input->idx[k] = input->idx[k - 1];
-		input->dst[k] = input->dst[k - 1];
+		input->idx[i*K+k] = input->idx[i*K+k-1];
+		input->dst[i*K+k] = input->dst[i*K+k-1];
 	}
 
 	//Inserisco il nuovo vicino
-	input->idx[position] = j;
-	input->dst[position] = dst_j;
+	input->idx[i*K+position] = j;
+	input->dst[i*K+position] = dst_j;
 }
 
 static void w(const int i, const int j, params* input) {
-	type sigma_i = input->sigma[i];
-	type sigma_j = input->sigma[j];
+	const int p = input->idx[i * K + j];          // numero del punto vicino
 
-	type sisj = sigma_i * sigma_j;
-	type dstq_vivj = input->dst[i * K + j];				//La distanza è già al quadrato, è stata salvata così
+	type sisp = input->sigma[i] * input->sigma[p];
+	type d2   = input->dst[i * K + j];             // d²(vi, vp): qui j è la posizione, ed è giusto
 
-	type wij = sisj / (sisj + dstq_vivj);
+	type wip = sisp / (sisp + d2);                 // Eq. (4)
 
-	input->W[i * input->N + j] = wij;
-	input->W[j * input->N + i] = wij;
+	input->W[i * input->N + p] = wip;
+	input->W[p * input->N + i] = wip;              // W simmetrica
 }
 
 static void g(const int i, params* input) {
@@ -75,18 +74,13 @@ static void g(const int i, params* input) {
 }
 
 static void m(const int i, const int j, params* input) {
+	const int p = input->idx[i * K + j];
 
+	type wip = input->W[i * input->N + p];
+	type mip = wip / sqrt(input->g[i] * input->g[p]);   // Eq. (6)
 
-	//NOTA BENE
-	//NELLE ALTRE VERSIONI, CALCOLARE LA MATRICE M USANDO LA SECONDA
-	//DEFINIZIONE, OVVERO IL PRODOTTO TRA G^-1/2 * W * G^-1/2
-	type wij = input->W[i * input->N + j];
-	type gigj = input->g[i] * input->g[j];
-	type mij = wij / sqrt(gigj);
-
-	input->M[i * input->N + j] = mij;
-	input->M[j * input->N + i] = mij;
-
+	input->M[i * input->N + p] = mip;
+	input->M[p * input->N + i] = mip;
 }
 
 static type scalar_product(const int j, const int l, params* input) {
@@ -147,9 +141,9 @@ void knngraph(params* input){
 	initialize_KNN(input);								//CHIEDERE - Inizializzazione totale e non ad ogni iterazione i come nello pseudo-codice.
 	for (int i = 0; i < input->N; i++) {
 		const type* vi = &input->DS[i * input->D];			//Prendo il PTO i di dimensione D
-		for (int j = 0; j < input->D; j++) {
+		for (int j = 0; j < input->N; j++) {
 			if (j != i) {
-				const type* vj = &input->DS[i * input->D + j];
+				const type* vj = &input->DS[input->D * j];
 				const type dst_j = calculate_dst(vi, vj, input->D);
 				const type dst_MAX = input->dst[i * K + (K - 1)];			//Assumo che la distanza massima sia quella del PTO più lontano nel vettore della distanza
 				if (dst_j < dst_MAX) {								        //Questo if le prime K volte sarà sempre vero, quindi forse si potrebbe valutare di fare altro
@@ -174,7 +168,7 @@ void affinity(params* input){
 
 	int i;
 	for (i = 0; i < input->N; i++) {
-		input->sigma[i] = sqrt(input->dst[(i * K) + K]);
+		input->sigma[i] = sqrt(input->dst[(i * K) + (K-1)]);
 	}
 
 	//Costruire l'insieme degli archi come scritto nello pseudo-codice non è necessario
@@ -207,7 +201,7 @@ void affinity(params* input){
 */
 void eigenvectors(params* input){
 
-	type* U = calloc(input->N * input->c, sizeof(type));
+	input->U = calloc(input->N * input->c, sizeof(type));
 
 	for (int i = 0; i < input->N; i++){
 		for (int j = 0; j < input->c; j++){
@@ -220,7 +214,7 @@ void eigenvectors(params* input){
 		}
 	}
 
-	orthonormalize(U);
+	orthonormalize(input);
 	type* Z = calloc(input->N * input->c, sizeof(type));
 	type sum = 0.0;
 
@@ -235,20 +229,20 @@ void eigenvectors(params* input){
 			}
 		}
 
-		orthonormalize(Z); // chiamo la funzione orthonormalize supponendo che dentro la funzione vengano aggiornati i valori di Z
 
-
-		type* temp = U;   // Salvo il vecchio indirizzo U
-		U = Z;            // Il nuovo U punta all'ortonormalizzazione di Z (la t-esima)
+		type* temp = input->U;   // Salvo il vecchio indirizzo U
+		input->U = Z;            // Il nuovo U punta all'ortonormalizzazione di Z (la t-esima)
 		Z = temp;        // Z prende il valore del vecchio puntatore U, in questo modo può essere sovrascritto tranquillamente, se non
 		// avessimo fatto così, U e Z avrebbero puntato allo stesso array in memoria e avrei ad ogni iterazione, modificato i valori sia di Z che di U
 		// ma Z usa i valori di U che non devono cambiare durante il ciclo, se al ciclo successivo usa un valore sovrascritto, il risultato è falsato.
 
+		orthonormalize(input); // chiamo la funzione orthonormalize supponendo che dentro la funzione vengano aggiornati i valori di Z
+
+
 
 	}
 
-	memcpy(input->Y, U, input->N * input->c * sizeof(type));
-	free(U);
+	memcpy(input->Y, input->U, input->N * input->c * sizeof(type));
 	free(Z);  // mi è servito per la computazione interna alla funzione, lo dealloco in quanto non mi serve più.
 
 }
@@ -270,7 +264,10 @@ void normalize(params* input) {
 
 		const type norm = sqrtf(s);
 		for (int t = 0; t < input->c; t++)
-			input->Y[i * input->c + t] = input->U[i * input->c + t] / norm;
+			if(norm>0){
+				input->Y[i * input->c + t] = input->U[i * input->c + t] / norm;
+			}
+
 	}
 }
 

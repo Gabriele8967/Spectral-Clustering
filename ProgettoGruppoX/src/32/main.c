@@ -128,12 +128,14 @@ int main(int argc, char** argv) {
 	params* input = malloc(sizeof(params));
 
 	input->DS = load_data(dsfilename, &input->N, &input->D);
+    /*
 	input->nn_id = NULL;
 	input->nn_dist = NULL;
 	input->row_ptr = NULL;
 	input->col_idx = NULL;
 	input->val = NULL;
 	input->nnz = 0;
+     */
 	input->c = c;
 	input->eig_iters = T;
 	input->silent = silent;
