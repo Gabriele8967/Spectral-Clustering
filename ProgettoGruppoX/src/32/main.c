@@ -119,9 +119,9 @@ void check_params(params* input){
 int main(int argc, char** argv) {
 
 	// ================= Parametri di ingresso =================
-	char* dsfilename = "ds.ds2";
-	int c = 2;
-	int T = 1000;
+	char* dsfilename = "dataset-n2000xD64-c16-32.ds2";
+	int c = 16;
+	int T = 10;
 	int silent = 0;
 	// =========================================================
 
