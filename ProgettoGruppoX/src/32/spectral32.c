@@ -3,6 +3,7 @@
 #include <xmmintrin.h>
 #include <math.h>
 #include <omp.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -86,6 +87,44 @@ static void m(const int i, const int j, params* input) {
 	input->M[i * input->N + j] = mij;
 	input->M[j * input->N + i] = mij;
 
+}
+
+/*
+*	orthonormalize
+*	==============
+*
+*	Ortonormalizza (in place) le c colonne della matrice A (N x c, row-major)
+*	con il metodo di Gram-Schmidt modificato.
+*	Una colonna linearmente dipendente dalle precedenti (norma ~0) viene azzerata.
+*/
+static void orthonormalize(type* A, const int N, const int c) {
+
+	for (int j = 0; j < c; j++) {
+
+		// Sottraggo dalla colonna j le proiezioni sulle colonne precedenti (gia' ortonormali)
+		for (int k = 0; k < j; k++) {
+			type dot = 0;
+			for (int i = 0; i < N; i++)
+				dot += A[i * c + k] * A[i * c + j];
+
+			for (int i = 0; i < N; i++)
+				A[i * c + j] -= dot * A[i * c + k];
+		}
+
+		// Normalizzo la colonna j
+		type norm = 0;
+		for (int i = 0; i < N; i++)
+			norm += A[i * c + j] * A[i * c + j];
+		norm = sqrt(norm);
+
+		if (norm > 1e-12) {
+			for (int i = 0; i < N; i++)
+				A[i * c + j] /= norm;
+		} else {
+			for (int i = 0; i < N; i++)
+				A[i * c + j] = 0;
+		}
+	}
 }
 
 // Funzione di esempio scritta in assembly (spectral32.nasm)
