@@ -1,35 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <common.h>
+#include "common.h"
+#include <string.h>
 
 
-type* eigenvectors(const type* M, params* p){
+void eigenvectors(params* input){
 
-    type* U = calloc(p->N * p->c, sizeof(type));
+    type* U = calloc(input->N * input->c, sizeof(type));
 
-    for (int i = 0; i < p->N; i++){
-        for (int j = 0; j < p->c; j++){
-            if( i % p->c == j ){
-                U[i * p-> c + j] = 1;
+    for (int i = 0; i < input->N; i++){
+        for (int j = 0; j < input->c; j++){
+            if( i % input->c == j ){
+                U[i * input-> c + j] = 1;
             }
             else{
-                U[i * p-> c + j] = 0;
+                U[i * input-> c + j] = 0;
             }
         }
     }
 
     orthonormalize(U);
-    type* Z = calloc(p->N * p->c, sizeof(type));
+    type* Z = calloc(input->N * input->c, sizeof(type));
     type sum = 0.0;
 
-    for (int t = 0; t < p->eig_iters; t++){
-        for(int i = 0; i < p->N; i++){
-            for(int j = 0; j < p->c; j++){
+    for (int t = 0; t < input->eig_iters; t++){
+        for(int i = 0; i < input->N; i++){
+            for(int j = 0; j < input->c; j++){
                 sum = 0.0;
-                for(int k = 0; k < p->N; k++){
-                    sum += M[i *p->N + k]*U[k * p->c + j];
+                for(int k = 0; k < input->N; k++){
+                    sum += input->M[i *input->N + k]*U[k * input->c + j];
                 }
-            Z[i * p->c + j] = (U[i * p->c + j] + sum) / 2;
+            Z[i * input->c + j] = (U[i * input->c + j] + sum) / 2;
             }
         }
 
@@ -44,7 +45,10 @@ type* eigenvectors(const type* M, params* p){
 
     
     }
-    free(Z); // mi è servito per la computazione interna alla funzione, lo dealloco in quanto non mi serve più.
-    return U;
+    
+    memcpy(input->Y, U, input->N * input->c * sizeof(type));
+    free(U);
+    free(Z);  // mi è servito per la computazione interna alla funzione, lo dealloco in quanto non mi serve più.
+
 }
 
