@@ -33,6 +33,7 @@ prova:
 		push		rbx		; salva i registri da preservare
 		push		rsi
 		push		rdi
+
 		; ------------------------------------------------------------
 		; legge i parametri dal Record di Attivazione corrente
 		; ------------------------------------------------------------

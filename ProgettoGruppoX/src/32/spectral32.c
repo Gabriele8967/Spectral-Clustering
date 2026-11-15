@@ -3,6 +3,7 @@
 #include <xmmintrin.h>
 #include <math.h>
 #include <omp.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -88,8 +89,50 @@ static void m(const int i, const int j, params* input) {
 
 }
 
-// Funzione di esempio scritta in assembly (spectral32.nasm)
+static type scalar_product(const int j, const int l, params* input) {
 
+	type r = 0;
+	for (int i = 0; i < input->N; i++) {
+		r += input->U[i * input->c + l] * input->U[i * input->c + j];
+	}
+	return r;
+}
+
+static void orthonormalize(params* input){
+	for (int j = 0; j < input->c; j++) {
+		for (int l = 0; l < j; l++) {
+			const type r = scalar_product(j, l, input);
+			for (int i = 0; i < input->N; i++) {
+				input->U[i * input->c + j] -= r * input->U[i * input->c + l];
+			}
+		}
+
+		const type norm = sqrt(scalar_product(j, j, input));
+
+		for (int i = 0; i < input->N; i++) {
+			input->U[i * input->c + j] /= norm;
+		}
+	}
+}
+
+static void allocate(params* input) {
+	const int N = input->N;
+	const int c = input->c;
+
+	input->idx   = (int*)  _mm_malloc(N * K * sizeof(int),  align);
+	input->dst   = (VECTOR)_mm_malloc(N * K * sizeof(type), align);
+	input->sigma = (VECTOR)_mm_malloc(N * sizeof(type),     align);
+	input->g     = (VECTOR)_mm_malloc(N * sizeof(type),     align);
+	input->W     = (MATRIX)_mm_malloc(N * N * sizeof(type), align);
+	input->M     = (MATRIX)_mm_malloc(N * N * sizeof(type), align);
+	input->U     = (MATRIX)_mm_malloc(N * c * sizeof(type), align);
+
+	memset(input->W, 0, N * N * sizeof(type));
+	memset(input->M, 0, N * N * sizeof(type));
+
+}
+
+// Funzione di esempio scritta in assembly (spectral32.nasm)
 extern void prova(params* input);
 
 /*
@@ -101,8 +144,7 @@ extern void prova(params* input);
 *	Le liste sono ordinate per distanza; a parita' vince l'indice minore.
 */
 void knngraph(params* input){
-
-	initialize_KNN(input);									//CHIEDERE - Inizializzazione totale e non ad ogni iterazione i come nello pseudo-codice.
+	initialize_KNN(input);								//CHIEDERE - Inizializzazione totale e non ad ogni iterazione i come nello pseudo-codice.
 	for (int i = 0; i < input->N; i++) {
 		const type* vi = &input->DS[i * input->D];			//Prendo il PTO i di dimensione D
 		for (int j = 0; j < input->D; j++) {
@@ -117,6 +159,7 @@ void knngraph(params* input){
 		}
 	}
 }
+
 
 /*
 *	affinity
@@ -173,9 +216,20 @@ void eigenvectors(params* input){
 *	Normalizza ogni riga di input->U in modo che abbia norma unitaria,
 *	ottenendo (in place) la matrice Y. Una riga nulla resta nulla.
 */
-void normalize(params* input){
-	// TODO
+void normalize(params* input) {
+
+	for (int i = 0; i < input->N; i++) {
+
+		type s = 0;
+		for (int t = 0; t < input->c; t++)
+			s += input->U[i * input->c + t] * input->U[i * input->c + t];
+
+		const type norm = sqrtf(s);
+		for (int t = 0; t < input->c; t++)
+			input->Y[i * input->c + t] = input->U[i * input->c + t] / norm;
+	}
 }
+
 
 /*
 *	spectral
@@ -191,12 +245,13 @@ void normalize(params* input){
 *	Le strutture intermedie allocate qui vanno liberate con spectral_free.
 */
 void spectral(params* input){
+	allocate(input);
+
 	knngraph(input);
 	affinity(input);
 	eigenvectors(input);
 	normalize(input);
-	// Esempio di chiamata a una funzione assembly: da rimuovere
-	prova(input);
+	//prova(input);
 }
 
 /*
@@ -206,10 +261,14 @@ void spectral(params* input){
 *	Libera eventuali strutture intermedie
 */
 void spectral_free(params* input){
-	//deallocare la memoria delle varie matrici/vettori utilizzate
+	_mm_free(input->idx);    input->idx   = NULL;
+	_mm_free(input->dst);    input->dst   = NULL;
+	_mm_free(input->sigma);  input->sigma = NULL;
+	_mm_free(input->g);      input->g     = NULL;
+	_mm_free(input->W);      input->W     = NULL;
+	_mm_free(input->M);      input->M     = NULL;
+	_mm_free(input->U);      input->U     = NULL;
 }
 
-int main(int argc, char *argv[]) {
-	return 0;
-}
+
 
